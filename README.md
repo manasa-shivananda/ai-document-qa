@@ -81,7 +81,7 @@ Open http://localhost:3000 in your browser.
 
 ## 📸 Demo
 
-Screenshot coming soon
+![AI Document Q&A Demo](Screenshot.jpg.png)
 
 ---
 
