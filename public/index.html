@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Document Q&A</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0a0a0f;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+    }
+
+    /* ── Header ── */
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 0.25rem;
+      background: linear-gradient(135deg, #a78bfa, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #64748b;
+      font-size: 0.875rem;
+      margin-bottom: 2rem;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #12121a;
+      border: 1px solid #1e1e2e;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Drop Zone ── */
+    .drop-zone {
+      border: 2px dashed #2d2d44;
+      border-radius: 10px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: #818cf8;
+      background: rgba(129, 140, 248, 0.04);
+    }
+
+    .drop-zone.uploaded {
+      border-color: #34d399;
+      background: rgba(52, 211, 153, 0.04);
+    }
+
+    .drop-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .drop-text {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .drop-text strong {
+      color: #818cf8;
+    }
+
+    .drop-hint {
+      color: #475569;
+      font-size: 0.75rem;
+      margin-top: 0.5rem;
+    }
+
+    .file-info {
+      display: none;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: #1a1a2e;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+
+    .file-info.visible {
+      display: flex;
+    }
+
+    .file-info .name {
+      flex: 1;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-info .meta {
+      color: #34d399;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    /* ── Hidden file input ── */
+    #file-input {
+      display: none;
+    }
+
+    /* ── Question Area ── */
+    .question-row {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .question-input {
+      flex: 1;
+      background: #1a1a2e;
+      border: 1px solid #2d2d44;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .question-input:focus {
+      border-color: #818cf8;
+    }
+
+    .question-input::placeholder {
+      color: #475569;
+    }
+
+    .ask-btn {
+      padding: 0.75rem 1.5rem;
+      background: linear-gradient(135deg, #7c3aed, #6366f1);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .ask-btn:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .ask-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .ask-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ── Spinner ── */
+    .spinner-wrap {
+      display: none;
+      justify-content: center;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 2rem 0;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .spinner-wrap.visible {
+      display: flex;
+    }
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid #2d2d44;
+      border-top-color: #818cf8;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── Answer ── */
+    .answer-card {
+      display: none;
+    }
+
+    .answer-card.visible {
+      display: block;
+    }
+
+    .answer-text {
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+    }
+
+    .page-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .page-badge {
+      background: rgba(129, 140, 248, 0.12);
+      color: #a5b4fc;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.3rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid rgba(129, 140, 248, 0.2);
+    }
+
+    /* ── Error ── */
+    .error-msg {
+      display: none;
+      padding: 0.85rem 1rem;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      border-radius: 8px;
+      color: #fca5a5;
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .error-msg.visible {
+      display: block;
+    }
+
+    /* ── Upload progress ── */
+    .upload-progress {
+      display: none;
+      margin-top: 1rem;
+    }
+
+    .upload-progress.visible {
+      display: block;
+    }
+
+    .progress-bar-bg {
+      height: 4px;
+      background: #1e1e2e;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #818cf8, #a78bfa);
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    .progress-label {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AI Document Q&A</h1>
+    <p class="subtitle">Upload a PDF and ask questions about its content</p>
+
+    <!-- Error -->
+    <div id="error" class="error-msg"></div>
+
+    <!-- Upload Card -->
+    <div class="card">
+      <div class="card-title">Upload Document</div>
+      <div id="drop-zone" class="drop-zone">
+        <div class="drop-icon">&#128196;</div>
+        <div class="drop-text"><strong>Click to upload</strong> or drag & drop</div>
+        <div class="drop-hint">PDF only &middot; Max 50 MB</div>
+      </div>
+      <input type="file" id="file-input" accept="application/pdf" />
+      <div id="file-info" class="file-info">
+        <span class="name" id="file-name"></span>
+        <span class="meta" id="file-meta"></span>
+      </div>
+      <div id="upload-progress" class="upload-progress">
+        <div class="progress-bar-bg"><div id="progress-bar" class="progress-bar"></div></div>
+        <div id="progress-label" class="progress-label">Uploading...</div>
+      </div>
+    </div>
+
+    <!-- Question Card -->
+    <div class="card">
+      <div class="card-title">Ask a Question</div>
+      <div class="question-row">
+        <input
+          type="text"
+          id="question"
+          class="question-input"
+          placeholder="e.g. What are the key findings?"
+          disabled
+        />
+        <button id="ask-btn" class="ask-btn" disabled>Ask</button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="spinner" class="spinner-wrap">
+      <div class="spinner"></div>
+      <span>Analyzing document...</span>
+    </div>
+
+    <!-- Answer Card -->
+    <div id="answer-card" class="card answer-card">
+      <div class="card-title">Answer</div>
+      <div id="answer-text" class="answer-text"></div>
+      <div id="page-badges" class="page-badges"></div>
+    </div>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const fileMeta = document.getElementById('file-meta');
+    const uploadProgress = document.getElementById('upload-progress');
+    const progressBar = document.getElementById('progress-bar');
+    const progressLabel = document.getElementById('progress-label');
+    const questionInput = document.getElementById('question');
+    const askBtn = document.getElementById('ask-btn');
+    const spinner = document.getElementById('spinner');
+    const answerCard = document.getElementById('answer-card');
+    const answerText = document.getElementById('answer-text');
+    const pageBadges = document.getElementById('page-badges');
+    const errorEl = document.getElementById('error');
+
+    let currentDocId = null;
+
+    /* ── Helpers ── */
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.classList.add('visible');
+      setTimeout(() => errorEl.classList.remove('visible'), 6000);
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    /* ── Drag & Drop ── */
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    /* ── Upload ── */
+    async function handleFile(file) {
+      if (file.type !== 'application/pdf') {
+        showError('Only PDF files are allowed.');
+        return;
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        showError('File too large. Maximum size is 50 MB.');
+        return;
+      }
+
+      // Reset state
+      currentDocId = null;
+      questionInput.disabled = true;
+      askBtn.disabled = true;
+      answerCard.classList.remove('visible');
+      dropZone.classList.remove('uploaded');
+      fileInfo.classList.remove('visible');
+
+      // Show progress
+      uploadProgress.classList.add('visible');
+      progressBar.style.width = '0%';
+      progressLabel.textContent = 'Uploading...';
+
+      const formData = new FormData();
+      formData.append('pdf', file);
+
+      try {
+        // Use XMLHttpRequest for upload progress
+        const result = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/upload');
+
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              progressBar.style.width = pct + '%';
+              if (pct === 100) progressLabel.textContent = 'Processing PDF...';
+            }
+          });
+
+          xhr.addEventListener('load', () => {
+            const data = JSON.parse(xhr.responseText);
+            if (xhr.status >= 400) reject(new Error(data.error || 'Upload failed'));
+            else resolve(data);
+          });
+
+          xhr.addEventListener('error', () => reject(new Error('Network error')));
+          xhr.send(formData);
+        });
+
+        currentDocId = result.docId;
+
+        // Update UI
+        uploadProgress.classList.remove('visible');
+        dropZone.classList.add('uploaded');
+        fileName.textContent = file.name;
+        fileMeta.textContent = result.totalPages + ' pages \u00B7 ' + result.totalChunks + ' chunks';
+        fileInfo.classList.add('visible');
+        questionInput.disabled = false;
+        askBtn.disabled = false;
+        questionInput.focus();
+      } catch (err) {
+        uploadProgress.classList.remove('visible');
+        showError(err.message);
+      }
+    }
+
+    /* ── Ask ── */
+    async function askQuestion() {
+      const question = questionInput.value.trim();
+      if (!question || !currentDocId) return;
+
+      askBtn.disabled = true;
+      answerCard.classList.remove('visible');
+      spinner.classList.add('visible');
+
+      try {
+        const res = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ docId: currentDocId, question }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Failed to get answer');
+
+        spinner.classList.remove('visible');
+
+        // Show answer
+        answerText.textContent = data.answer;
+        pageBadges.innerHTML = '';
+        if (data.pages && data.pages.length > 0) {
+          for (const p of data.pages) {
+            const badge = document.createElement('span');
+            badge.className = 'page-badge';
+            badge.textContent = 'Page ' + p;
+            pageBadges.appendChild(badge);
+          }
+        }
+        answerCard.classList.add('visible');
+      } catch (err) {
+        spinner.classList.remove('visible');
+        showError(err.message);
+      } finally {
+        askBtn.disabled = false;
+      }
+    }
+
+    askBtn.addEventListener('click', askQuestion);
+    questionInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !askBtn.disabled) askQuestion();
+    });
+  </script>
+</body>
+</html>
